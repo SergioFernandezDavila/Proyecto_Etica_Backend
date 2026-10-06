@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: property-service-test
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/inmob_property_test
+      auto-index-creation: true
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+
+# Disable Eureka for tests
+eureka:
+  client:
+    enabled: false
+
+# Logging configuration for tests
+logging:
+  level:
+    root: WARN
+    com.inmobiliaria: INFO
+    org.springframework.test: INFO
+
+# Security configuration for tests
+security:
+  jwt:
+    secret: test-secret-key-for-testing-purposes-only
+    expiration: 3600000

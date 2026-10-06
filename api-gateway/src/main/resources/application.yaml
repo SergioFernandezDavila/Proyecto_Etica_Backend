@@ -1,0 +1,176 @@
+server:
+  port: ${API_GATEWAY_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: identity-service
+          uri: lb://IDENTITY-SERVICE
+          predicates:
+            - Path=/api/v1/auth/**, /api/v1/auth, /api/v1/users/**, /api/v1/users
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: identity-service-docs
+          uri: lb://IDENTITY-SERVICE
+          predicates:
+            - Path=/identity-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: access-control-service
+          uri: lb://ACCESS-CONTROL-SERVICE
+          predicates:
+            - Path=/api/v1/roles/**, /api/v1/roles, /api/v1/permissions/**, /api/v1/permissions
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: access-control-service-docs
+          uri: lb://ACCESS-CONTROL-SERVICE
+          predicates:
+            - Path=/access-control-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: notification-service
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/api/v1/notifications/**, /api/v1/notifications
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: notification-service-docs
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/notification-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: property-service
+          uri: lb://PROPERTY-SERVICE
+          predicates:
+            - Path=/api/v1/properties/**, /api/v1/properties, /api/v1/documents/**, /api/v1/documents, /api/v1/catalogos/**
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: property-service-docs
+          uri: lb://PROPERTY-SERVICE
+          predicates:
+            - Path=/property-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: user-service
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/v1/persons/**, /api/v1/persons, /api/v1/favoritos/**, /api/v1/favoritos, /api/v1/buscadores/**, /api/v1/buscadores
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: user-service-docs
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/user-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: visit-calendar-service
+          uri: lb://visit-calendar-service
+          predicates:
+            - Path=/api/v1/calendar/**, /api/v1/calendar, /api/v1/visits/**, /api/v1/visits, /api/v1/visit-requests/**, /api/v1/visit-requests, /api/v1/reassignments/**, /api/v1/reassignments, /api/v1/vehicles/**, /api/v1/vehicles, /api/v1/visits/*/reschedule, /api/v1/visits/*/rescheduled, /api/v1/reports/**, /api/v1/reports, /api/v1/agents/**, /api/v1/availability-templates/**
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: visit-calendar-service-docs
+          uri: lb://visit-calendar-service
+          predicates:
+            - Path=/visit-calendar-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+        - id: visit-calendar-service-alertas
+          uri: lb://visit-calendar-service
+          predicates:
+            - Path=/api/v1/alertas/**
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+
+        - id: operation-service
+          uri: lb://operation-service
+          predicates:
+            - Path=/api/v1/operations/**, /api/v1/operations, /api/v1/dashboard/**
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: operation-service-docs
+          uri: lb://operation-service
+          predicates:
+            - Path=/operation-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: contract-service
+          uri: lb://contract-service
+          predicates:
+            - Path=/api/v1/contracts/**
+          filters:
+            - AuthenticationFilter
+            - StripPrefix=2
+        - id: contract-service-docs
+          uri: lb://contract-service
+          predicates:
+            - Path=/contract-service/v3/api-docs
+          filters:
+            - StripPrefix=1
+app:
+  jwt:
+    secret: ${JWT_SECRET:bd2b1aaf7ef4f09be9f52ce2d8d599674d81aa9d6a4421696dc4d93dd0619d682ce56b4d64a9ef097761ced99e0f67265b5f76085e5b0ee7ca4696b2ad6fe2b2}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: identity-service
+        url: /identity-service/v3/api-docs
+      - name: access-control-service
+        url: /access-control-service/v3/api-docs
+      - name: notification-service
+        url: /notification-service/v3/api-docs
+      - name: property-service
+        url: /property-service/v3/api-docs
+      - name: user-service
+        url: /user-service/v3/api-docs
+      - name: visit-calendar-service
+        url: /visit-calendar-service/v3/api-docs
+      - name: visit-calendar-service-alertas
+        url: /visit-calendar-service/v3/api-docs
+      - name: operation-service
+        url: /operation-service/v3/api-docs
+      - name: contract-service
+        url: /contract-service/v3/api-docs
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    eureka-server-read-timeout-seconds: 30
+    eureka-server-connect-timeout-seconds: 10
+    registry-fetch-interval-seconds: 30
+    initial-instance-info-replication-interval-seconds: 40
+  instance:
+    hostname: ${EUREKA_HOST:localhost}
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+
+logging:
+  level:
+    root: ERROR
+    "[com.inmobiliaria.api_gateway]": DEBUG

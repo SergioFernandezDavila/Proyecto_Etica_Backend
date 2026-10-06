@@ -1,0 +1,54 @@
+server:
+  port: ${NOTIFICATION_SERVICE_PORT:8083}
+
+spring:
+  application:
+    name: notification-service
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:admin}:${MONGO_PASS:admin}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${NOTIFICATION_DB:notification_db}?authSource=${MONGO_AUTH_SOURCE:admin}
+  jackson:
+    time-zone: UTC
+    date-format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+    serialization:
+      write-dates-as-timestamps: false
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASS:}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+app:
+  mail:
+    from: no-reply@realestate.local
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    root: ERROR
+    '[com.inmobiliaria.notification_service]': DEBUG
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    eureka-server-read-timeout-seconds: 30
+    eureka-server-connect-timeout-seconds: 10
+    registry-fetch-interval-seconds: 30
+    initial-instance-info-replication-interval-seconds: 40
+  instance:
+    hostname: ${EUREKA_HOST:localhost}
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90

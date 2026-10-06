@@ -1,0 +1,36 @@
+server:
+  port: ${ACCESS_CONTROL_SERVICE_PORT:8082}
+
+spring:
+  application:
+    name: access-control-service
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:admin}:${MONGO_PASS:admin}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${ACCESS_CONTROL_DB:access_control_db}?authSource=${MONGO_AUTH_SOURCE:admin}
+  cache:
+    type: caffeine
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    root: ERROR
+    '[com.inmobiliaria.access_control_service]': DEBUG
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    eureka-server-read-timeout-seconds: 30
+    eureka-server-connect-timeout-seconds: 10
+    registry-fetch-interval-seconds: 30
+    initial-instance-info-replication-interval-seconds: 40
+  instance:
+    hostname: ${EUREKA_HOST:localhost}
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90

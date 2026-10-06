@@ -1,0 +1,23 @@
+server:
+  port: ${EUREKA_PORT:8761}
+
+spring:
+  application:
+    name: service-registry
+
+logging:
+  level:
+    root: ERROR
+    '[com.netflix.eureka]': WARN
+
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    wait-time-in-ms-when-sync-empty: 0
+  instance:
+    hostname: ${EUREKA_HOST:localhost}
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90

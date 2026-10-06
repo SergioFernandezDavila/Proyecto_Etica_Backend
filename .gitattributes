@@ -1,0 +1,26 @@
+# Forzar LF para todos los archivos de texto (incluyendo Java, XML, YAML, etc.)
+* text=auto eol=lf
+
+# Archivos específicos de Windows que deben mantener CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Archivos binarios - no convertir
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.log binary
+*.class binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Maven Wrapper puede mantener LF (ya que se ejecuta en Linux/Unix)
+mvnw text eol=lf
+*.mvn/* text eol=lf

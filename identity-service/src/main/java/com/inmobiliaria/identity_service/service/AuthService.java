@@ -1,0 +1,183 @@
+package com.inmobiliaria.identity_service.service;
+
+import com.inmobiliaria.identity_service.client.NotificationClient;
+import com.inmobiliaria.identity_service.client.UserServiceClient;
+import com.inmobiliaria.identity_service.domain.UserDocument;
+import com.inmobiliaria.identity_service.domain.UserStatus;
+import com.inmobiliaria.identity_service.domain.UserType;
+import com.inmobiliaria.identity_service.dto.request.ChangePasswordRequest;
+import com.inmobiliaria.identity_service.dto.request.LoginRequest;
+import com.inmobiliaria.identity_service.dto.request.ResendTempPasswordRequest;
+import com.inmobiliaria.identity_service.dto.response.AuthResponse;
+import com.inmobiliaria.identity_service.exception.EmailSendException;
+import com.inmobiliaria.identity_service.exception.TemporaryPasswordExpiredException;
+import com.inmobiliaria.identity_service.exception.UnauthorizedException;
+import com.inmobiliaria.identity_service.security.Auditable;
+import com.inmobiliaria.identity_service.security.JwtService;
+import com.inmobiliaria.identity_service.security.UserPrincipal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+  private final UserService userService;
+  private final BCryptPasswordEncoder passwordEncoder;
+  private final JwtService jwtService;
+  private final RoleClientService roleClientService;
+  private final NotificationClient notificationClient;
+  private final UserServiceClient userServiceClient;
+
+  @Auditable(action = "USER_LOGIN", description = "User logged in")
+  public AuthResponse login(LoginRequest request) {
+    log.debug("Login attempt for email: {}", request.email());
+    UserDocument user = userService.findByEmailNormalized(request.email().trim().toLowerCase());
+    log.debug("User found: ID={}, Status={}", user.getId(), user.getStatus());
+
+    if (user.getStatus() != UserStatus.ACTIVE) {
+      log.warn("Login failed: user {} is not active (Status: {})", user.getId(), user.getStatus());
+      throw new UnauthorizedException("User is not active");
+    }
+
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+      log.warn("Login failed: invalid password for user {}", user.getId());
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    if (Boolean.TRUE.equals(user.getTemporaryPassword())
+        && user.getTemporaryPasswordExpiresAt() != null
+        && Instant.now().isAfter(user.getTemporaryPasswordExpiresAt())) {
+      throw new TemporaryPasswordExpiredException("Temporary password has expired");
+    }
+
+    if (user.getUserType() == UserType.INTERESTED_CLIENT) {
+      try {
+        userServiceClient.updateLastActivity(user.getId());
+        log.info("Updated lastActivityDate for client: {}", user.getId());
+      } catch (Exception e) {
+        log.warn(
+            "Could not update lastActivityDate for client {}: {}", user.getId(), e.getMessage());
+      }
+    }
+
+    String refreshToken = UUID.randomUUID().toString();
+    user.setRefreshToken(refreshToken);
+    user.setRefreshTokenExpiresAt(Instant.now().plus(7, ChronoUnit.DAYS));
+    user.setLastLoginAt(Instant.now());
+    userService.save(user);
+
+    List<String> roleCodes = roleClientService.resolveRoleCodes(user.getPrimaryRoleIds());
+
+    UserPrincipal principal =
+        new UserPrincipal(
+            user.getId(),
+            user.getEmailNormalized(),
+            roleCodes,
+            user.getUserType().name(),
+            user.getStatus().name());
+
+    return new AuthResponse(
+        user.getId(),
+        jwtService.generateAccessToken(principal),
+        refreshToken,
+        "Bearer",
+        jwtService.getAccessTokenExpirationSeconds(),
+        Boolean.TRUE.equals(user.getMustChangePassword()));
+  }
+
+  public AuthResponse refresh(String refreshToken) {
+    UserDocument user = userService.findByRefreshToken(refreshToken);
+
+    if (user == null || user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
+
+    String newRefreshToken = UUID.randomUUID().toString();
+    user.setRefreshToken(newRefreshToken);
+    user.setRefreshTokenExpiresAt(Instant.now().plus(7, ChronoUnit.DAYS));
+    userService.save(user);
+
+    List<String> roleCodes = roleClientService.resolveRoleCodes(user.getPrimaryRoleIds());
+
+    UserPrincipal principal =
+        new UserPrincipal(
+            user.getId(),
+            user.getEmailNormalized(),
+            roleCodes,
+            user.getUserType().name(),
+            user.getStatus().name());
+
+    return new AuthResponse(
+        user.getId(),
+        jwtService.generateAccessToken(principal),
+        newRefreshToken,
+        "Bearer",
+        jwtService.getAccessTokenExpirationSeconds(),
+        Boolean.TRUE.equals(user.getMustChangePassword()));
+  }
+
+  @Auditable(action = "USER_LOGOUT", description = "User logged out")
+  public void logout(String refreshToken) {
+    UserDocument user = userService.findByRefreshToken(refreshToken);
+    if (user != null) {
+      user.setRefreshToken(null);
+      user.setRefreshTokenExpiresAt(null);
+      userService.save(user);
+    }
+  }
+
+  @Auditable(action = "PASSWORD_CHANGE", description = "User changed password")
+  public void changePassword(ChangePasswordRequest request) {
+    UserDocument user = userService.findByEmailNormalized(request.email().trim().toLowerCase());
+
+    if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+      throw new UnauthorizedException("Current password is invalid");
+    }
+
+    user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+    user.setTemporaryPassword(false);
+    user.setTemporaryPasswordExpiresAt(null);
+    user.setMustChangePassword(false);
+    user.setPasswordChangedAt(Instant.now());
+
+    userService.save(user);
+  }
+
+  public void resendTemporaryPassword(ResendTempPasswordRequest request) {
+    UserDocument user = userService.findByEmailNormalized(request.email().trim().toLowerCase());
+
+    if (!Boolean.TRUE.equals(user.getTemporaryPassword())
+        && !Boolean.TRUE.equals(user.getMustChangePassword())) {
+      throw new UnauthorizedException("User does not require temporary password reset");
+    }
+
+    String newTemporaryPassword = userService.generateTemporaryPassword();
+
+    user.setPasswordHash(passwordEncoder.encode(newTemporaryPassword));
+    user.setTemporaryPassword(true);
+    user.setTemporaryPasswordExpiresAt(Instant.now().plus(5, ChronoUnit.MINUTES));
+    user.setMustChangePassword(true);
+    user.setPasswordChangedAt(null);
+    userService.save(user);
+
+    try {
+      notificationClient.sendCredentialsEmail(
+          NotificationClient.CredentialsRequest.builder()
+              .to(user.getEmailNormalized())
+              .fullName(user.getFullName())
+              .temporaryPassword(newTemporaryPassword)
+              .build());
+    } catch (Exception e) {
+      log.error("Failed to resend credentials email to: {}", user.getEmailNormalized(), e);
+      throw new EmailSendException("Failed to send email", e);
+    }
+  }
+}

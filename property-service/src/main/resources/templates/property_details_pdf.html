@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ficha de Propiedad · DROCA INMOBILIARIA</title>
+    <style>
+      /* =========================================================
+           CONFIGURACIÓN DE PÁGINA (iText pdfHTML compatible)
+           ========================================================= */
+      @page {
+        size: letter;
+        margin-top: 108px;
+        margin-right: 36px;
+        margin-bottom: 70px;
+        margin-left: 36px;
+      }
+
+      /* =========================================================
+           RESET & BASE
+           ========================================================= */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 11px;
+        color: #1a1a2e;
+        background: #ffffff;
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .content {
+        margin-top: 0;
+        padding-top: 0;
+      }
+
+      /* =========================================================
+           TÍTULO DE PROPIEDAD
+           ========================================================= */
+      .title-block {
+        margin-top: 10px;
+        margin-bottom: 18px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #ede8e2;
+      }
+
+      .property-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0a1628;
+        margin-bottom: 5px;
+      }
+
+      .property-address {
+        font-size: 11px;
+        color: #7a7a8e;
+        font-weight: 400;
+      }
+
+      /* =========================================================
+           TABLA PRINCIPAL (IMAGEN + DETALLES)
+           ========================================================= */
+      .main-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        table-layout: fixed;
+      }
+
+      .image-column {
+        width: 50%;
+        vertical-align: top;
+        padding-right: 12px;
+      }
+
+      .details-column {
+        width: 50%;
+        vertical-align: top;
+        padding-left: 12px;
+      }
+
+      .image-wrap {
+        border: 1px solid #e8e2db;
+        background: #f5f2ee;
+        width: 100%;
+        text-align: center;
+      }
+
+      .image-wrap img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .no-image {
+        padding: 130px 0;
+        color: #b0aaa0;
+        font-size: 11px;
+        font-weight: 500;
+        text-align: center;
+      }
+
+      /* Caja de precio */
+      .price-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #0a1628;
+        margin-bottom: 12px;
+      }
+
+      .price-accent-bar {
+        width: 3px;
+        background: #c8956c;
+        padding: 0;
+      }
+
+      .price-inner {
+        padding: 14px 18px 12px 14px;
+        vertical-align: middle;
+      }
+
+      .price-label {
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: rgba(255, 255, 255, 0.45);
+        font-weight: 500;
+      }
+
+      .price-value {
+        font-size: 26px;
+        font-weight: 700;
+        color: #ffffff;
+        margin-top: 3px;
+      }
+
+      /* Detalles de la propiedad */
+      .details-card {
+        border: 1px solid #e8e2db;
+        width: 100%;
+      }
+
+      .details-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+      }
+
+      .details-table td {
+        padding: 10px 14px;
+        border-bottom: 1px solid #f2eeea;
+        font-size: 11px;
+      }
+
+      .details-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .detail-label {
+        width: 40%;
+        background: #faf8f5;
+        font-weight: 600;
+        color: #5a5a6e;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        border-right: 1px solid #e8e2db;
+      }
+
+      .detail-value {
+        color: #1a1a2e;
+        font-weight: 500;
+      }
+
+      /* Estado */
+      .status {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 3px 12px 3px 8px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border-left: 3px solid #2e7d32;
+        background: #e8f5e9;
+        color: #2e7d32;
+        display: inline-block;
+      }
+
+      .status-disponible {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border-left-color: #2e7d32;
+      }
+
+      .status-reservado {
+        background: #fff8e1;
+        color: #e65100;
+        border-left-color: #e65100;
+      }
+
+      .status-vendido {
+        background: #ffebee;
+        color: #b71c1c;
+        border-left-color: #b71c1c;
+      }
+
+      /* =========================================================
+           SECCIÓN CONTACTO + QR
+           ========================================================= */
+      .contact-section {
+        margin-top: 20px;
+        border-top: 1px solid #e8e2db;
+        padding-top: 20px;
+      }
+
+      .contact-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .contact-info {
+        width: 66%;
+        vertical-align: top;
+        padding-right: 12px;
+      }
+
+      .qr-info {
+        width: 34%;
+        vertical-align: top;
+        padding-left: 12px;
+      }
+
+      .contact-card {
+        border: 1px solid #e8e2db;
+        background: #faf8f5;
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .contact-accent {
+        height: 3px;
+        background: #c8956c;
+      }
+
+      .contact-body {
+        padding: 14px 18px;
+      }
+
+      .contact-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #0a1628;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+      }
+
+      .contact-text {
+        font-size: 10px;
+        color: #7a7a8e;
+        margin-bottom: 10px;
+        line-height: 1.6;
+      }
+
+      .contact-details-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .contact-details-table td {
+        padding: 4px 0;
+        font-size: 10px;
+        vertical-align: top;
+      }
+
+      .contact-label {
+        font-weight: 600;
+        color: #0a1628;
+        width: 68px;
+        font-size: 9px;
+        text-transform: uppercase;
+        padding-right: 8px;
+      }
+
+      .contact-value {
+        color: #4a4a5e;
+      }
+
+      .qr-card {
+        border: 1px solid #e8e2db;
+        background: #ffffff;
+        padding: 14px;
+        text-align: center;
+      }
+
+      .qr-card img {
+        width: 100px;
+        height: 100px;
+        display: block;
+        margin: 0 auto;
+      }
+
+      .qr-caption {
+        margin-top: 8px;
+        font-size: 9px;
+        font-weight: 700;
+        color: #0a1628;
+        text-transform: uppercase;
+      }
+
+      .qr-sub {
+        font-size: 8px;
+        color: #9a9aaa;
+        margin-top: 3px;
+      }
+
+      .qr-url {
+        margin-top: 6px;
+        word-break: break-all;
+        line-height: 1.2;
+      }
+
+      .qr-url a {
+        font-size: 7px;
+        color: #c8956c;
+        text-decoration: underline;
+        font-family: monospace;
+      }
+    </style>
+    <base target="_blank" />
+  </head>
+  <body>
+    <div class="content">
+      <!-- Título -->
+      <div class="title-block">
+        <div class="property-title" th:text="${property.title}">Luxury Apartment</div>
+        <div class="property-address" th:text="|${property.address}, ${property.zone}|">
+          Main St, Downtown
+        </div>
+      </div>
+
+      <!-- Tabla Imagen + Detalles -->
+      <table class="main-table">
+        <tr>
+          <td class="image-column">
+            <div class="image-wrap">
+              <img th:if="${mainImageBase64 != null}" th:src="${mainImageBase64}" alt="Property" />
+              <div th:unless="${mainImageBase64 != null}" class="no-image">
+                Imagen no disponible
+              </div>
+            </div>
+          </td>
+          <td class="details-column">
+            <!-- PRECIO -->
+            <table class="price-table">
+              <tr>
+                <td class="price-accent-bar">&nbsp;</td>
+                <td class="price-inner">
+                  <div class="price-label">Precio</div>
+                  <div class="price-value" th:text="${formattedPrice}">$500,000</div>
+                </td>
+              </tr>
+            </table>
+
+            <!-- DETALLES -->
+            <div class="details-card">
+              <table class="details-table">
+                <tr>
+                  <td class="detail-label">Operación</td>
+                  <td class="detail-value" th:text="${property.operationType}">Venta</td>
+                </tr>
+                <tr>
+                  <td class="detail-label">Tipo</td>
+                  <td class="detail-value" th:text="${property.type}">Apartamento</td>
+                </tr>
+                <tr>
+                  <td class="detail-label">Superficie</td>
+                  <td class="detail-value" th:text="${property.m2 + ' m²'}">120 m²</td>
+                </tr>
+                <tr>
+                  <td class="detail-label">Habitaciones</td>
+                  <td class="detail-value" th:text="${property.rooms}">3</td>
+                </tr>
+                <tr>
+                  <td class="detail-label">Estado</td>
+                  <td class="detail-value">
+                    <span
+                      class="status"
+                      th:classappend="${property.status.name() == 'RESERVADO' ? 'status-reservado' : 
+                                                      (property.status.name() == 'VENDIDO' ? 'status-vendido' : 'status-disponible')}"
+                      th:text="${property.status}"
+                    >
+                      DISPONIBLE
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="detail-label">ID</td>
+                  <td class="detail-value" th:text="${property.id}">PROP-001</td>
+                </tr>
+              </table>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- SECCIÓN CONTACTO + QR -->
+      <div class="contact-section">
+        <table class="contact-table">
+          <tr>
+            <td class="contact-info">
+              <table class="contact-card">
+                <tr><td class="contact-accent" colspan="2"></td></tr>
+                <tr>
+                  <td class="contact-body">
+                    <div class="contact-title">Información de Contacto</div>
+                    <div class="contact-text">
+                      Contacte a nuestro agente para más información o para programar una visita.
+                    </div>
+                    <table class="contact-details-table">
+                      <tr>
+                        <td class="contact-label">Agente</td>
+                        <td class="contact-value" th:text="${agentName}">Support Team</td>
+                      </tr>
+                      <tr>
+                        <td class="contact-label">Email</td>
+                        <td class="contact-value" th:text="${agentEmail}">
+                          support@drocainmob.com
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="contact-label">Teléfono</td>
+                        <td class="contact-value" th:text="${agentPhone}">+56 9 1234 5678</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td class="qr-info">
+              <div class="qr-card">
+                <img th:src="${qrCode}" alt="QR" />
+                <div class="qr-caption">Ver en línea</div>
+                <div class="qr-sub">Escanee para más detalles</div>
+                <div class="qr-url">
+                  <a
+                    th:href="'http://localhost:5173/properties?selectedId=' + ${property.id}"
+                    th:text="'http://localhost:5173/properties?selectedId=' + ${property.id}"
+                  >
+                    http://localhost:5173/properties?selectedId=prop_venta_001
+                  </a>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

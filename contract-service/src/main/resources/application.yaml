@@ -1,0 +1,33 @@
+server:
+  port: ${CONTRACT_SERVICE_PORT:8088}
+
+spring:
+  application:
+    name: contract-service
+
+# MongoDB
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:admin}:${MONGO_PASS:admin}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${CONTRACT_DB:contract_db}?authSource=${MONGO_AUTH_SOURCE:admin}
+  jackson:
+    time-zone: UTC
+    date-format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+    serialization:
+      write-dates-as-timestamps: false
+
+# Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    hostname: ${EUREKA_HOST:localhost}
+    prefer-ip-address: true
+
+# Logging
+logging:
+  level:
+    root: ERROR
+    "[com.inmobiliaria.contract_service]": DEBUG
