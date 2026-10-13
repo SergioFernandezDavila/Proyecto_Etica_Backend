@@ -1,5 +1,6 @@
 package com.inmobiliaria.access_control_service.dto.response;
 
+import com.inmobiliaria.access_control_service.domain.AccessType;
 import com.inmobiliaria.access_control_service.domain.ScopeType;
 
 public record PermissionCatalogResponse(
@@ -8,4 +9,5 @@ public record PermissionCatalogResponse(
     String action,
     ScopeType scope,
     String description,
-    Boolean active) {}
+    Boolean active,
+    AccessType accessType) {}
