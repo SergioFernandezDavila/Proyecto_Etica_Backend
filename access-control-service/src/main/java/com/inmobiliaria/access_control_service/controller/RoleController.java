@@ -1,5 +1,6 @@
 package com.inmobiliaria.access_control_service.controller;
 
+import com.inmobiliaria.access_control_service.domain.PermissionEntry;
 import com.inmobiliaria.access_control_service.dto.request.CreateRoleRequest;
 import com.inmobiliaria.access_control_service.dto.request.RoleMatrixBatchUpdateRequest;
 import com.inmobiliaria.access_control_service.dto.request.UpdateRoleRequest;
@@ -49,6 +50,14 @@ public class RoleController {
     RoleMatrixResponse matrix = roleService.updateMatrix(request);
     return ResponseEntity.ok(
         responseFactory.success("Matriz de roles y permisos actualizada exitosamente", matrix));
+  }
+
+  @GetMapping("/me/permissions")
+  public ResponseEntity<ApiResponse<List<PermissionEntry>>> getMyPermissions(
+      @RequestHeader(value = "X-Auth-Roles", required = false) String rolesHeader) {
+    List<PermissionEntry> permissions = roleService.findPermissionsByRoleCodes(rolesHeader);
+    return ResponseEntity.ok(
+        responseFactory.success("Permisos del usuario obtenidos exitosamente", permissions));
   }
 
   @GetMapping("/{id}")

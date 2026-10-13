@@ -49,6 +49,30 @@ public class RoleService {
     return roleRepository.findByIdInAndActiveTrue(ids).stream().map(this::toResponse).toList();
   }
 
+  public List<PermissionEntry> findPermissionsByRoleCodes(String rolesHeader) {
+    List<PermissionEntry> result = new ArrayList<>();
+    if (rolesHeader == null || rolesHeader.isBlank()) {
+      return result;
+    }
+    String cleaned = rolesHeader.replace("[", "").replace("]", "");
+    for (String code : cleaned.split(",")) {
+      String trimmed = code.trim().toUpperCase();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      roleRepository
+          .findByCode(trimmed)
+          .filter(role -> Boolean.TRUE.equals(role.getActive()))
+          .ifPresent(
+              role -> {
+                if (role.getPermissions() != null) {
+                  result.addAll(role.getPermissions());
+                }
+              });
+    }
+    return result;
+  }
+
   @CacheEvict(value = "roles", allEntries = true)
   public RoleResponse create(CreateRoleRequest request) {
     if (roleRepository.existsByCode(request.code())) {
