@@ -8,7 +8,9 @@ import com.inmobiliaria.identity_service.domain.UserType;
 import com.inmobiliaria.identity_service.dto.request.ChangePasswordRequest;
 import com.inmobiliaria.identity_service.dto.request.LoginRequest;
 import com.inmobiliaria.identity_service.dto.request.ResendTempPasswordRequest;
+import com.inmobiliaria.identity_service.dto.request.TwoFactorLoginRequest;
 import com.inmobiliaria.identity_service.dto.response.AuthResponse;
+import com.inmobiliaria.identity_service.dto.response.TwoFactorSetupResponse;
 import com.inmobiliaria.identity_service.exception.EmailSendException;
 import com.inmobiliaria.identity_service.exception.TemporaryPasswordExpiredException;
 import com.inmobiliaria.identity_service.exception.UnauthorizedException;
@@ -35,6 +37,7 @@ public class AuthService {
   private final RoleClientService roleClientService;
   private final NotificationClient notificationClient;
   private final UserServiceClient userServiceClient;
+  private final TotpService totpService;
 
   @Auditable(action = "USER_LOGIN", description = "User logged in")
   public AuthResponse login(LoginRequest request) {
@@ -58,6 +61,88 @@ public class AuthService {
       throw new TemporaryPasswordExpiredException("Temporary password has expired");
     }
 
+    // If 2FA is enabled, return a pre-auth token requiring second factor
+    if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
+      log.info("2FA required for user: {}", user.getId());
+      String preAuthToken = jwtService.generatePreAuthToken(user.getId());
+      return AuthResponse.requires2fa(preAuthToken);
+    }
+
+    return issueTokens(user);
+  }
+
+  @Auditable(action = "USER_LOGIN_2FA", description = "User logged in with 2FA")
+  public AuthResponse verifyTwoFactorLogin(TwoFactorLoginRequest request) {
+    String userId = jwtService.validatePreAuthTokenAndGetUserId(request.preAuthToken());
+    UserDocument user = userService.findDocumentById(userId);
+
+    if (user.getStatus() != UserStatus.ACTIVE) {
+      throw new UnauthorizedException("User is not active");
+    }
+
+    if (!Boolean.TRUE.equals(user.getTwoFactorEnabled()) || user.getTwoFactorSecret() == null) {
+      throw new UnauthorizedException("2FA is not enabled for this user");
+    }
+
+    boolean valid = totpService.verifyCode(user.getTwoFactorSecret(), request.code());
+    if (!valid) {
+      log.warn("Invalid 2FA code provided for user: {}", userId);
+      throw new UnauthorizedException("Invalid 2FA verification code");
+    }
+
+    log.info("2FA verification succeeded for user: {}", userId);
+    return issueTokens(user);
+  }
+
+  public TwoFactorSetupResponse setupTwoFactor(String userId) {
+    UserDocument user = userService.findDocumentById(userId);
+    String secret = totpService.generateSecret();
+    user.setTwoFactorTempSecret(secret);
+    userService.save(user);
+
+    String otpAuthUrl = totpService.generateOtpAuthUrl("Inmobiliaria", user.getEmail(), secret);
+    String qrCodeDataUri = totpService.generateQrCodeDataUri(otpAuthUrl);
+
+    return new TwoFactorSetupResponse(secret, qrCodeDataUri, otpAuthUrl);
+  }
+
+  public void confirmTwoFactor(String userId, String code) {
+    UserDocument user = userService.findDocumentById(userId);
+    if (user.getTwoFactorTempSecret() == null) {
+      throw new UnauthorizedException("No pending 2FA setup found. Please start setup again.");
+    }
+
+    boolean valid = totpService.verifyCode(user.getTwoFactorTempSecret(), code);
+    if (!valid) {
+      throw new UnauthorizedException("Invalid 2FA code. Please check your authenticator app.");
+    }
+
+    user.setTwoFactorSecret(user.getTwoFactorTempSecret());
+    user.setTwoFactorTempSecret(null);
+    user.setTwoFactorEnabled(true);
+    userService.save(user);
+    log.info("2FA successfully enabled for user: {}", userId);
+  }
+
+  public void disableTwoFactor(String userId, String code) {
+    UserDocument user = userService.findDocumentById(userId);
+    if (!Boolean.TRUE.equals(user.getTwoFactorEnabled()) || user.getTwoFactorSecret() == null) {
+      throw new UnauthorizedException("2FA is not enabled for this user");
+    }
+
+    boolean valid = totpService.verifyCode(user.getTwoFactorSecret(), code);
+    if (!valid) {
+      throw new UnauthorizedException("Invalid 2FA code");
+    }
+
+    user.setTwoFactorEnabled(false);
+    user.setTwoFactorSecret(null);
+    user.setTwoFactorTempSecret(null);
+    userService.save(user);
+    log.info("2FA successfully disabled for user: {}", userId);
+  }
+
+  private AuthResponse issueTokens(UserDocument user) {
     if (user.getUserType() == UserType.INTERESTED_CLIENT) {
       try {
         userServiceClient.updateLastActivity(user.getId());

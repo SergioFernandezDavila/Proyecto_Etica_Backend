@@ -12,6 +12,10 @@ app:
   jwt:
     secret: ${JWT_SECRET:bd2b1aaf7ef4f09be9f52ce2d8d599674d81aa9d6a4421696dc4d93dd0619d682ce56b4d64a9ef097761ced99e0f67265b5f76085e5b0ee7ca4696b2ad6fe2b2}
     access-token-expiration-seconds: ${JWT_EXPIRATION:3600}
+  recaptcha:
+    # Google reCAPTCHA v2 secret key (defaults to Google's official test key)
+    secret-key: ${RECAPTCHA_SECRET_KEY:6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe}
+    enabled: ${RECAPTCHA_ENABLED:true}
 
 management:
   endpoints:

@@ -17,4 +17,5 @@ public record UserResponse(
     Instant temporaryPasswordExpiresAt,
     Boolean mustChangePassword,
     List<String> primaryRoleIds,
-    String assignedAgentId) {}
+    String assignedAgentId,
+    Boolean twoFactorEnabled) {}

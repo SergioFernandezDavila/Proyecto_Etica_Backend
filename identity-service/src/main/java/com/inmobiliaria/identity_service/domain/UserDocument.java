@@ -50,4 +50,8 @@ public class UserDocument extends BaseDocument {
 
   private String refreshToken;
   private Instant refreshTokenExpiresAt;
+
+  private Boolean twoFactorEnabled;
+  private String twoFactorSecret;
+  private String twoFactorTempSecret;
 }

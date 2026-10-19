@@ -323,6 +323,12 @@ public class UserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
   }
 
+  public UserDocument findDocumentById(String id) {
+    return userRepository
+        .findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+  }
+
   public List<UserResponse> findAllByUserType(UserType userType) {
     return userRepository.findByUserType(userType).stream()
         .map(this::toResponse)
@@ -371,6 +377,7 @@ public class UserService {
         document.getTemporaryPasswordExpiresAt(),
         document.getMustChangePassword(),
         document.getPrimaryRoleIds(),
-        document.getAssignedAgentId());
+        document.getAssignedAgentId(),
+        Boolean.TRUE.equals(document.getTwoFactorEnabled()));
   }
 }
