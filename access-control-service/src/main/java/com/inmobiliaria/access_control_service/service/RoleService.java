@@ -13,7 +13,9 @@ import com.inmobiliaria.access_control_service.dto.response.RoleMatrixResponse;
 import com.inmobiliaria.access_control_service.dto.response.RoleResponse;
 import com.inmobiliaria.access_control_service.exception.ResourceAlreadyExistsException;
 import com.inmobiliaria.access_control_service.exception.ResourceNotFoundException;
+import com.inmobiliaria.access_control_service.exception.ValidationException;
 import com.inmobiliaria.access_control_service.repository.RoleRepository;
+import com.inmobiliaria.access_control_service.security.Auditable;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -73,13 +75,17 @@ public class RoleService {
     return result;
   }
 
-  @CacheEvict(value = "roles", allEntries = true)
+  @Auditable(action = "ROLE_CREATE", description = "Creación de nuevo rol en el sistema")
+  @CacheEvict(
+      value = {"roles", "rolesMatrix"},
+      allEntries = true)
   public RoleResponse create(CreateRoleRequest request) {
-    if (roleRepository.existsByCode(request.code())) {
-      throw new ResourceAlreadyExistsException("Role code already exists: " + request.code());
+    String normalizedCode = request.code().trim().toUpperCase();
+    if (roleRepository.existsByCode(normalizedCode)) {
+      throw new ResourceAlreadyExistsException("Role code already exists: " + normalizedCode);
     }
 
-    if (roleRepository.existsByName(request.name())) {
+    if (roleRepository.existsByName(request.name().trim())) {
       throw new ResourceAlreadyExistsException("Role name already exists: " + request.name());
     }
 
@@ -88,7 +94,7 @@ public class RoleService {
 
     RoleDocument document =
         RoleDocument.builder()
-            .code(request.code().trim().toUpperCase())
+            .code(normalizedCode)
             .name(request.name().trim())
             .description(request.description().trim())
             .type(RoleType.CUSTOM)
@@ -104,7 +110,12 @@ public class RoleService {
     return toResponse(roleRepository.save(document));
   }
 
-  @CacheEvict(value = "roles", allEntries = true)
+  @Auditable(
+      action = "ROLE_UPDATE",
+      description = "Actualización de información y permisos del rol")
+  @CacheEvict(
+      value = {"roles", "rolesMatrix"},
+      allEntries = true)
   public RoleResponse update(String id, UpdateRoleRequest request) {
     RoleDocument existing = findDocumentById(id);
 
@@ -119,6 +130,22 @@ public class RoleService {
     existing.setUpdatedAt(Instant.now());
 
     return toResponse(roleRepository.save(existing));
+  }
+
+  @Auditable(action = "ROLE_DELETE", description = "Eliminación de rol personalizado del sistema")
+  @CacheEvict(
+      value = {"roles", "rolesMatrix"},
+      allEntries = true)
+  public void delete(String id) {
+    RoleDocument existing = findDocumentById(id);
+
+    if (existing.getType() == RoleType.SYSTEM) {
+      throw new ValidationException(
+          "No se pueden eliminar los roles reservados del sistema: " + existing.getCode());
+    }
+
+    roleRepository.delete(existing);
+    log.info("Rol con ID {} ({}) eliminado exitosamente", id, existing.getCode());
   }
 
   @Cacheable("rolesMatrix")
@@ -248,6 +275,9 @@ public class RoleService {
     return new RoleMatrixResponse(modules, availableActions, accessTypes, rows);
   }
 
+  @Auditable(
+      action = "ROLE_MATRIX_UPDATE",
+      description = "Actualización masiva de matriz de roles y permisos")
   @CacheEvict(
       value = {"roles", "rolesMatrix"},
       allEntries = true)
