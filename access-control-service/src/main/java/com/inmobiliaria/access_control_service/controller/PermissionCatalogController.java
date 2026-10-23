@@ -1,5 +1,6 @@
 package com.inmobiliaria.access_control_service.controller;
 
+import com.inmobiliaria.access_control_service.domain.AccessType;
 import com.inmobiliaria.access_control_service.dto.response.ApiResponse;
 import com.inmobiliaria.access_control_service.dto.response.PermissionCatalogResponse;
 import com.inmobiliaria.access_control_service.dto.response.ResponseFactory;
@@ -23,10 +24,28 @@ public class PermissionCatalogController {
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<ApiResponse<List<PermissionCatalogResponse>>> findAll(
-      @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int pageSize) {
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "100") int pageSize) {
     Page<PermissionCatalogResponse> permissionsPage =
         permissionCatalogService.findAll(PageRequest.of(page, pageSize));
     return ResponseEntity.ok(
         responseFactory.paginated("Permissions retrieved successfully", permissionsPage));
+  }
+
+  @GetMapping("/all")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ApiResponse<List<PermissionCatalogResponse>>> findAllList() {
+    List<PermissionCatalogResponse> list = permissionCatalogService.findAll();
+    return ResponseEntity.ok(
+        responseFactory.success("All permissions retrieved successfully", list));
+  }
+
+  @PatchMapping("/{id}/access-type")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ApiResponse<PermissionCatalogResponse>> updateAccessType(
+      @PathVariable String id, @RequestParam AccessType accessType) {
+    PermissionCatalogResponse updated = permissionCatalogService.updateAccessType(id, accessType);
+    return ResponseEntity.ok(
+        responseFactory.success("Permission access type updated successfully", updated));
   }
 }

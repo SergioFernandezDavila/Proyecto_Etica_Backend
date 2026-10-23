@@ -24,4 +24,5 @@ public class PermissionCatalogDocument extends BaseDocument {
   private ScopeType scope;
   private String description;
   private Boolean active;
+  private AccessType accessType;
 }

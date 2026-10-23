@@ -16,4 +16,6 @@ public class PermissionEntry {
   @NotBlank private String action;
 
   @NotNull private ScopeType scope;
+
+  private AccessType accessType;
 }
