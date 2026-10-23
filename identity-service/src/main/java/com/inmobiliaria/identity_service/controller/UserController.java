@@ -86,6 +86,38 @@ public class UserController {
     return ResponseEntity.ok(responseFactory.success("User reactivated successfully", response));
   }
 
+  @PutMapping("/{id}/block")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ApiResponse<UserResponse>> blockUser(
+      @PathVariable String id,
+      @RequestParam(required = false, defaultValue = "Bloqueado por administrador") String reason) {
+    UserResponse response = userService.blockUser(id, reason);
+    return ResponseEntity.ok(responseFactory.success("User blocked successfully", response));
+  }
+
+  @PutMapping("/{id}/unblock")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ApiResponse<UserResponse>> unblockUser(@PathVariable String id) {
+    UserResponse response = userService.unblockUser(id);
+    return ResponseEntity.ok(responseFactory.success("User unblocked successfully", response));
+  }
+
+  @PostMapping("/{id}/reset-password")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ApiResponse<Void>> adminResetPassword(@PathVariable String id) {
+    userService.adminResetPassword(id);
+    return ResponseEntity.ok(
+        responseFactory.success("Temporary password generated and sent to user", null));
+  }
+
+  @PutMapping("/{id}/mfa")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ApiResponse<UserResponse>> toggleMfa(
+      @PathVariable String id, @RequestParam boolean enabled) {
+    UserResponse response = userService.setMfaEnabled(id, enabled);
+    return ResponseEntity.ok(responseFactory.success("MFA setting updated successfully", response));
+  }
+
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<ApiResponse<Void>> delete(@PathVariable String id) {

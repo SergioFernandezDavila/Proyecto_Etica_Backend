@@ -4,6 +4,7 @@ import com.inmobiliaria.identity_service.dto.request.ChangePasswordRequest;
 import com.inmobiliaria.identity_service.dto.request.LoginRequest;
 import com.inmobiliaria.identity_service.dto.request.RefreshTokenRequest;
 import com.inmobiliaria.identity_service.dto.request.ResendTempPasswordRequest;
+import com.inmobiliaria.identity_service.dto.request.VerifyMfaRequest;
 import com.inmobiliaria.identity_service.dto.response.ApiResponse;
 import com.inmobiliaria.identity_service.dto.response.AuthResponse;
 import com.inmobiliaria.identity_service.dto.response.ResponseFactory;
@@ -26,6 +27,14 @@ public class AuthController {
   public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
     AuthResponse response = authService.login(request);
     return ResponseEntity.ok(responseFactory.success("Authentication successful", response));
+  }
+
+  @PostMapping("/verify-mfa")
+  public ResponseEntity<ApiResponse<AuthResponse>> verifyMfa(
+      @Valid @RequestBody VerifyMfaRequest request) {
+    AuthResponse response = authService.verifyMfa(request);
+    return ResponseEntity.ok(
+        responseFactory.success("Two-factor authentication successful", response));
   }
 
   @PostMapping("/change-password")

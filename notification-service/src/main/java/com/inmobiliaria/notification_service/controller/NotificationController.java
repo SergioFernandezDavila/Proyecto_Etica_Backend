@@ -5,6 +5,7 @@ import com.inmobiliaria.notification_service.domain.NotificationStatus;
 import com.inmobiliaria.notification_service.dto.request.SendAttachmentEmailRequest;
 import com.inmobiliaria.notification_service.dto.request.SendCredentialsEmailRequest;
 import com.inmobiliaria.notification_service.dto.request.SendInAppNotificationRequest;
+import com.inmobiliaria.notification_service.dto.request.SendMfaEmailRequest;
 import com.inmobiliaria.notification_service.dto.request.SendNotificationRequest;
 import com.inmobiliaria.notification_service.dto.response.ApiResponse;
 import com.inmobiliaria.notification_service.dto.response.InAppNotificationResponse;
@@ -40,6 +41,13 @@ public class NotificationController {
     NotificationResponse response = notificationService.sendCredentialsEmail(request);
     return ResponseEntity.ok(
         responseFactory.success("Credentials email sent successfully", response));
+  }
+
+  @PostMapping("/mfa")
+  public ResponseEntity<ApiResponse<NotificationResponse>> sendMfa(
+      @Valid @RequestBody SendMfaEmailRequest request) {
+    NotificationResponse response = notificationService.sendMfaEmail(request);
+    return ResponseEntity.ok(responseFactory.success("MFA email sent successfully", response));
   }
 
   @PostMapping("/send-attachment")

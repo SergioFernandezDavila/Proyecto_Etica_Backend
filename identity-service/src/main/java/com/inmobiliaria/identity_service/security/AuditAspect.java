@@ -109,6 +109,7 @@ public class AuditAspect {
               .timestamp(Instant.now())
               .details(details)
               .ipAddress(ipAddress)
+              .status("SUCCESS")
               .build();
 
       auditLogRepository.save(auditLog);

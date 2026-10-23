@@ -17,4 +17,41 @@ public record UserResponse(
     Instant temporaryPasswordExpiresAt,
     Boolean mustChangePassword,
     List<String> primaryRoleIds,
-    String assignedAgentId) {}
+    String assignedAgentId,
+    Boolean mfaEnabled,
+    Integer failedLoginAttempts,
+    Instant lockedUntil,
+    Instant passwordExpiresAt) {
+
+  public UserResponse(
+      String id,
+      String firstName,
+      String lastName,
+      String fullName,
+      String email,
+      UserType userType,
+      UserStatus status,
+      Boolean temporaryPassword,
+      Instant temporaryPasswordExpiresAt,
+      Boolean mustChangePassword,
+      List<String> primaryRoleIds,
+      String assignedAgentId) {
+    this(
+        id,
+        firstName,
+        lastName,
+        fullName,
+        email,
+        userType,
+        status,
+        temporaryPassword,
+        temporaryPasswordExpiresAt,
+        mustChangePassword,
+        primaryRoleIds,
+        assignedAgentId,
+        false,
+        0,
+        null,
+        null);
+  }
+}

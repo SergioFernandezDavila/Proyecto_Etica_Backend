@@ -5,6 +5,7 @@ import com.inmobiliaria.identity_service.client.UserServiceClient;
 import com.inmobiliaria.identity_service.client.dto.CreatePersonRequest;
 import com.inmobiliaria.identity_service.client.dto.PersonType;
 import com.inmobiliaria.identity_service.client.dto.UpdatePersonRequest;
+import com.inmobiliaria.identity_service.domain.AuditLog;
 import com.inmobiliaria.identity_service.domain.UserDocument;
 import com.inmobiliaria.identity_service.domain.UserStatus;
 import com.inmobiliaria.identity_service.domain.UserType;
@@ -17,11 +18,12 @@ import com.inmobiliaria.identity_service.exception.ResourceNotFoundException;
 import com.inmobiliaria.identity_service.exception.UnauthorizedException;
 import com.inmobiliaria.identity_service.repository.UserRepository;
 import com.inmobiliaria.identity_service.security.Auditable;
+import com.inmobiliaria.identity_service.security.PasswordPolicyValidator;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +45,8 @@ public class UserService {
   private final RoleClientService roleClientService;
   private final NotificationClient notificationClient;
   private final UserServiceClient userServiceClient;
+  private final PasswordPolicyValidator passwordPolicyValidator;
+  private final AuditService auditService;
 
   @Auditable(action = "USER_CREATE", description = "New user created")
   public UserResponse create(CreateUserRequest request) {
@@ -109,7 +113,7 @@ public class UserService {
     }
     roleClientService.validateRoleIdsExist(request.roleIds());
 
-    String temporaryPassword = generateTemporaryPassword();
+    String temporaryPassword = passwordPolicyValidator.generateCompliantPassword();
 
     UserDocument document =
         UserDocument.builder()
@@ -124,6 +128,9 @@ public class UserService {
             .temporaryPassword(true)
             .temporaryPasswordExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
             .mustChangePassword(true)
+            .mfaEnabled(false)
+            .failedLoginAttempts(0)
+            .previousPasswordHashes(new ArrayList<>())
             .primaryRoleIds(request.roleIds())
             .assignedAgentId(request.assignedAgentId())
             .metadata(Map.of("createdVia", "admin_panel"))
@@ -286,6 +293,13 @@ public class UserService {
 
   @Auditable(action = "USER_ROLE_ASSIGN", description = "User roles assigned/updated")
   public UserResponse assignRole(String userId, AssignRoleRequest request) {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    String currentUserId = (auth != null) ? auth.getName() : null;
+    if (currentUserId != null && currentUserId.equals(userId)) {
+      throw new UnauthorizedException(
+          "Regla de seguridad: Un usuario no puede auto-asignarse o modificar sus propios roles.");
+    }
+
     UserDocument user =
         userRepository
             .findById(userId)
@@ -296,6 +310,135 @@ public class UserService {
     user.setUpdatedAt(Instant.now());
 
     return toResponse(userRepository.save(user));
+  }
+
+  public UserResponse blockUser(String id, String reason) {
+    UserDocument user =
+        userRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+
+    user.setStatus(UserStatus.LOCKED);
+    user.setUpdatedAt(Instant.now());
+    UserDocument saved = userRepository.save(user);
+
+    auditService.record(
+        AuditLog.builder()
+            .action("USER_BLOCK")
+            .userId(user.getId())
+            .userEmail(user.getEmailNormalized())
+            .details(
+                "Usuario bloqueado por administrador. Motivo: "
+                    + (reason != null && !reason.isBlank()
+                        ? reason
+                        : "Bloqueado por administrador"))
+            .status("SUCCESS")
+            .build());
+
+    return toResponse(saved);
+  }
+
+  public UserResponse unblockUser(String id) {
+    UserDocument user =
+        userRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+
+    user.setStatus(UserStatus.ACTIVE);
+    user.setFailedLoginAttempts(0);
+    user.setLockedUntil(null);
+    user.setUpdatedAt(Instant.now());
+    UserDocument saved = userRepository.save(user);
+
+    auditService.record(
+        AuditLog.builder()
+            .action("USER_UNBLOCK")
+            .userId(user.getId())
+            .userEmail(user.getEmailNormalized())
+            .details("Usuario desbloqueado por administrador. Intentos fallidos restablecidos.")
+            .status("SUCCESS")
+            .build());
+
+    return toResponse(saved);
+  }
+
+  public void adminResetPassword(String id) {
+    UserDocument user =
+        userRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+
+    String temporaryPassword = passwordPolicyValidator.generateCompliantPassword();
+
+    // Guardar hash anterior en histórico si existía
+    List<String> history = user.getPreviousPasswordHashes();
+    if (history == null) {
+      history = new ArrayList<>();
+    } else {
+      history = new ArrayList<>(history);
+    }
+    if (user.getPasswordHash() != null) {
+      history.add(0, user.getPasswordHash());
+      if (history.size() > 5) {
+        history = history.subList(0, 5);
+      }
+    }
+    user.setPreviousPasswordHashes(history);
+
+    user.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+    user.setTemporaryPassword(true);
+    user.setTemporaryPasswordExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS));
+    user.setMustChangePassword(true);
+    user.setPasswordChangedAt(null);
+    user.setFailedLoginAttempts(0);
+    user.setLockedUntil(null);
+    user.setUpdatedAt(Instant.now());
+
+    userRepository.save(user);
+
+    try {
+      notificationClient.sendCredentialsEmail(
+          NotificationClient.CredentialsRequest.builder()
+              .to(user.getEmailNormalized())
+              .fullName(user.getFullName())
+              .temporaryPassword(temporaryPassword)
+              .build());
+    } catch (Exception e) {
+      log.error("Failed to send credentials email on admin password reset: {}", e.getMessage());
+    }
+
+    auditService.record(
+        AuditLog.builder()
+            .action("PASSWORD_RESET")
+            .userId(user.getId())
+            .userEmail(user.getEmailNormalized())
+            .details("Contraseña restablecida administrativamente con vigencia de 24 horas")
+            .status("SUCCESS")
+            .build());
+  }
+
+  public UserResponse setMfaEnabled(String id, boolean enabled) {
+    UserDocument user =
+        userRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+
+    user.setMfaEnabled(enabled);
+    user.setUpdatedAt(Instant.now());
+    UserDocument saved = userRepository.save(user);
+
+    auditService.record(
+        AuditLog.builder()
+            .action("USER_UPDATE")
+            .userId(user.getId())
+            .userEmail(user.getEmailNormalized())
+            .details(
+                "Doble factor de autenticación (MFA por correo) "
+                    + (enabled ? "habilitado" : "deshabilitado"))
+            .status("SUCCESS")
+            .build());
+
+    return toResponse(saved);
   }
 
   private void sendWelcomeEmail(UserDocument user, String password) {
@@ -346,7 +489,7 @@ public class UserService {
   }
 
   public String generateTemporaryPassword() {
-    return "Tmp-" + UUID.randomUUID().toString().substring(0, 8);
+    return passwordPolicyValidator.generateCompliantPassword();
   }
 
   private PersonType mapToPersonType(UserType userType) {
@@ -371,6 +514,10 @@ public class UserService {
         document.getTemporaryPasswordExpiresAt(),
         document.getMustChangePassword(),
         document.getPrimaryRoleIds(),
-        document.getAssignedAgentId());
+        document.getAssignedAgentId(),
+        Boolean.TRUE.equals(document.getMfaEnabled()),
+        document.getFailedLoginAttempts() != null ? document.getFailedLoginAttempts() : 0,
+        document.getLockedUntil(),
+        document.getPasswordExpiresAt());
   }
 }

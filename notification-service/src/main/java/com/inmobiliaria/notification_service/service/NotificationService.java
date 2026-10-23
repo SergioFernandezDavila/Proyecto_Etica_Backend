@@ -7,6 +7,7 @@ import com.inmobiliaria.notification_service.domain.NotificationStatus;
 import com.inmobiliaria.notification_service.dto.request.SendAttachmentEmailRequest;
 import com.inmobiliaria.notification_service.dto.request.SendCredentialsEmailRequest;
 import com.inmobiliaria.notification_service.dto.request.SendInAppNotificationRequest;
+import com.inmobiliaria.notification_service.dto.request.SendMfaEmailRequest;
 import com.inmobiliaria.notification_service.dto.response.InAppNotificationResponse;
 import com.inmobiliaria.notification_service.dto.response.NotificationResponse;
 import com.inmobiliaria.notification_service.exception.AccessDeniedException;
@@ -198,5 +199,62 @@ public class NotificationService {
                 Equipo de soporte
                 """
         .formatted(fullName, email, temporaryPassword);
+  }
+
+  public NotificationResponse sendMfaEmail(SendMfaEmailRequest request) {
+    String subject = "Código de verificación de seguridad (MFA)";
+    String body = buildMfaBody(request.fullName(), request.code());
+
+    try {
+      SimpleMailMessage message = new SimpleMailMessage();
+      message.setFrom(mailPropertiesConfig.getFrom());
+      message.setTo(request.to());
+      message.setSubject(subject);
+      message.setText(body);
+
+      mailSender.send(message);
+
+      emailLogRepository.save(
+          EmailLogDocument.builder()
+              .to(request.to())
+              .subject(subject)
+              .body(body)
+              .status(NotificationStatus.SENT)
+              .errorMessage(null)
+              .createdAt(Instant.now())
+              .build());
+
+      return new NotificationResponse("MFA email sent successfully", NotificationStatus.SENT);
+
+    } catch (Exception ex) {
+      emailLogRepository.save(
+          EmailLogDocument.builder()
+              .to(request.to())
+              .subject(subject)
+              .body(body)
+              .status(NotificationStatus.FAILED)
+              .errorMessage(ex.getMessage())
+              .createdAt(Instant.now())
+              .build());
+
+      throw new EmailSendException("Failed to send MFA email to " + request.to(), ex);
+    }
+  }
+
+  private String buildMfaBody(String fullName, String code) {
+    return """
+        Hola %s,
+
+        Tu código de verificación en dos pasos (MFA) para acceder al sistema es:
+
+        %s
+
+        Este código tiene una vigencia de 5 minutos.
+        Si no has solicitado este acceso, por favor ponte en contacto de inmediato con el administrador del sistema.
+
+        Saludos,
+        Equipo de Seguridad
+        """
+        .formatted(fullName != null && !fullName.isBlank() ? fullName : "Usuario", code);
   }
 }

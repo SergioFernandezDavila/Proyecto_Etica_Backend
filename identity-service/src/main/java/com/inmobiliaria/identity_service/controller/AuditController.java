@@ -31,6 +31,7 @@ public class AuditController {
   public ResponseEntity<ApiResponse<List<AuditLog>>> getAuditLogs(
       @RequestParam(required = false) String userId,
       @RequestParam(required = false) String action,
+      @RequestParam(required = false) String status,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
           Instant from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -41,6 +42,8 @@ public class AuditController {
     Query query = new Query();
     if (userId != null && !userId.isBlank()) query.addCriteria(Criteria.where("userId").is(userId));
     if (action != null && !action.isBlank()) query.addCriteria(Criteria.where("action").is(action));
+    if (status != null && !status.isBlank())
+      query.addCriteria(Criteria.where("status").is(status.trim().toUpperCase()));
 
     if (from != null || to != null) {
       Criteria dateCriteria = Criteria.where("timestamp");

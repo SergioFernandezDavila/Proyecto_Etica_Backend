@@ -25,4 +25,5 @@ public class AuditLog {
   private Instant timestamp;
   private String details;
   private String ipAddress; // Opcional: para auditoría más completa
+  private String status; // "SUCCESS" / "FAILURE"
 }

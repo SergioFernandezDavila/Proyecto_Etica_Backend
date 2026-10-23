@@ -89,6 +89,13 @@ public class GlobalExceptionHandler {
         .body(responseFactory.error("Validation failed", errors));
   }
 
+  @ExceptionHandler(ValidationException.class)
+  public ResponseEntity<ApiResponse<Void>> handleValidationException(ValidationException ex) {
+    log.warn("Validation error: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(responseFactory.error(ex.getMessage()));
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {
     log.error("Unhandled exception: ", ex);

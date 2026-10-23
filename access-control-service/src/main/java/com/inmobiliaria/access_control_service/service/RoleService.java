@@ -22,12 +22,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -91,6 +94,7 @@ public class RoleService {
 
     List<PermissionEntry> permissions = mapPermissions(request.permissions());
     permissionCatalogService.validatePermissionsExist(permissions);
+    validatePrivilegeEscalation(null, permissions);
 
     RoleDocument document =
         RoleDocument.builder()
@@ -121,6 +125,7 @@ public class RoleService {
 
     List<PermissionEntry> permissions = mapPermissions(request.permissions());
     permissionCatalogService.validatePermissionsExist(permissions);
+    validatePrivilegeEscalation(existing, permissions);
 
     existing.setName(request.name().trim());
     existing.setDescription(request.description().trim());
@@ -139,9 +144,10 @@ public class RoleService {
   public void delete(String id) {
     RoleDocument existing = findDocumentById(id);
 
-    if (existing.getType() == RoleType.SYSTEM) {
+    if (existing.getType() == RoleType.SYSTEM || "ADMIN".equalsIgnoreCase(existing.getCode())) {
       throw new ValidationException(
-          "No se pueden eliminar los roles reservados del sistema: " + existing.getCode());
+          "Regla de seguridad: No se pueden eliminar los roles reservados del sistema: "
+              + existing.getCode());
     }
 
     roleRepository.delete(existing);
@@ -320,6 +326,7 @@ public class RoleService {
       }
 
       permissionCatalogService.validatePermissionsExist(updatedPermissions);
+      validatePrivilegeEscalation(role, updatedPermissions);
 
       role.setPermissions(updatedPermissions);
       role.setVersion(role.getVersion() != null ? role.getVersion() + 1 : 1);
@@ -328,6 +335,72 @@ public class RoleService {
     }
 
     return getMatrix();
+  }
+
+  private void validatePrivilegeEscalation(
+      RoleDocument targetRole, List<PermissionEntry> newPermissions) {
+    if (newPermissions == null) {
+      return;
+    }
+
+    // Regla 3: El rol ADMIN no puede ser degradado ni despojado de los permisos centrales
+    if (targetRole != null && "ADMIN".equalsIgnoreCase(targetRole.getCode())) {
+      boolean hasUsersAccess =
+          newPermissions.stream()
+              .anyMatch(
+                  p ->
+                      "users".equalsIgnoreCase(p.getResource())
+                          && "read".equalsIgnoreCase(p.getAction()));
+      boolean hasAuditAccess =
+          newPermissions.stream()
+              .anyMatch(
+                  p ->
+                      "audit".equalsIgnoreCase(p.getResource())
+                          && "read".equalsIgnoreCase(p.getAction()));
+
+      if (!hasUsersAccess || !hasAuditAccess) {
+        throw new ValidationException(
+            "Regla de seguridad: El rol ADMIN no puede ser degradado ni despojado de los permisos centrales de seguridad, usuarios y auditoría.");
+      }
+    }
+
+    // Regla 2: Un administrador solo puede asignar o modificar permisos que él mismo posea
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth != null && auth.getAuthorities() != null && !auth.getAuthorities().isEmpty()) {
+      boolean isSuperAdmin =
+          auth.getAuthorities().stream()
+              .anyMatch(
+                  a ->
+                      "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority())
+                          || "ADMIN".equalsIgnoreCase(a.getAuthority()));
+
+      String callerName = auth.getName() != null ? auth.getName() : "";
+      if (!isSuperAdmin && !"SYSTEM".equalsIgnoreCase(callerName)) {
+        String userRoles =
+            auth.getAuthorities().stream()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .collect(Collectors.joining(","));
+
+        List<PermissionEntry> callerPermissions = findPermissionsByRoleCodes(userRoles);
+        for (PermissionEntry reqPerm : newPermissions) {
+          boolean callerHasPerm =
+              callerPermissions.stream()
+                  .anyMatch(
+                      cp ->
+                          cp.getResource().equalsIgnoreCase(reqPerm.getResource())
+                              && cp.getAction().equalsIgnoreCase(reqPerm.getAction()));
+
+          if (!callerHasPerm) {
+            throw new ValidationException(
+                "Prevención de escalación de privilegios: No posee el permiso '"
+                    + reqPerm.getResource()
+                    + ":"
+                    + reqPerm.getAction()
+                    + "' para otorgarlo a otro rol.");
+          }
+        }
+      }
+    }
   }
 
   private RoleDocument findDocumentById(String id) {

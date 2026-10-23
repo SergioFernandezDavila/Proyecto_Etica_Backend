@@ -36,9 +36,18 @@ public class UserDocument extends BaseDocument {
   private Boolean mustChangePassword;
 
   private Instant passwordChangedAt;
+  private Instant passwordExpiresAt;
   private Integer failedLoginAttempts;
   private Instant lockedUntil;
   private Instant lastLoginAt;
+
+  // Histórico de contraseñas (últimas 5)
+  private List<String> previousPasswordHashes;
+
+  // Doble Factor de Autenticación (MFA por Email)
+  private Boolean mfaEnabled;
+  private String mfaCode;
+  private Instant mfaCodeExpiresAt;
 
   private List<String> primaryRoleIds;
 
