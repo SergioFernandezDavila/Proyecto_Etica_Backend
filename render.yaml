@@ -1,0 +1,96 @@
+services:
+  # ---------------------------------------------------------------------------
+  # 1. API GATEWAY (Público - Web Service)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: api-gateway
+    env: docker
+    dockerfilePath: ./api-gateway/Dockerfile
+    dockerContext: ./api-gateway
+    plan: free
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: dev
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: http://service-registry:8761/eureka/
+      - key: SPRING_CLOUD_CONFIG_URI
+        value: http://config-server:8888
+
+  # ---------------------------------------------------------------------------
+  # 2. SERVICE REGISTRY (Privado - pserv)
+  # ---------------------------------------------------------------------------
+  - type: pserv
+    name: service-registry
+    env: docker
+    dockerfilePath: ./service-registry/Dockerfile
+    dockerContext: ./service-registry
+    plan: free
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: dev
+
+  # ---------------------------------------------------------------------------
+  # 3. PROPERTY SERVICE (Privado - pserv)
+  # ---------------------------------------------------------------------------
+  - type: pserv
+    name: property-service
+    env: docker
+    dockerfilePath: ./property-service/Dockerfile
+    dockerContext: ./property-service
+    plan: free
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: dev
+      - key: SPRING_DATA_MONGODB_URI
+        value: mongodb://admin:admin123@mongo-dev:27017/inmob_properties?authSource=admin
+      - key: MINIO_ENDPOINT
+        value: minio:9000
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: http://service-registry:8761/eureka/
+
+  # ---------------------------------------------------------------------------
+  # 4. MINIO (Privado - pserv usando la imagen oficial de Docker Hub)
+  # ---------------------------------------------------------------------------
+  - type: pserv
+    name: minio
+    env: image
+    image:
+      url: minio/minio:latest
+    plan: free
+    envVars:
+      - key: MINIO_ROOT_USER
+        value: minioadmin
+      - key: MINIO_ROOT_PASSWORD
+        value: minioadmin
+    dockerCommand: server /minio_storage --console-address ":9001"
+    disk:
+      name: minio-data
+      mountPath: /minio_storage
+      sizeGB: 1
+
+  # ---------------------------------------------------------------------------
+  # 5. MONGO DEV (Privado - pserv usando la imagen de Mongo)
+  # ---------------------------------------------------------------------------
+  - type: pserv
+    name: mongo-dev
+    env: image
+    image:
+      url: mongo:7.0
+    plan: free
+    envVars:
+      - key: MONGO_INITDB_ROOT_USERNAME
+        value: admin
+      - key: MONGO_INITDB_ROOT_PASSWORD
+        value: admin123
+    disk:
+      name: mongo-data-dev
+      mountPath: /data/db
+      sizeGB: 1
+
+  # ---------------------------------------------------------------------------
+  # 6. REDIS (Servicio gestionado de Render)
+  # ---------------------------------------------------------------------------
+  - type: redis
+    name: inmob-redis
+    plan: free
+    ipAllowList: []
