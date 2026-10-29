@@ -11,6 +11,7 @@ import com.inmobiliaria.identity_service.dto.request.LoginRequest;
 import com.inmobiliaria.identity_service.dto.request.ResendTempPasswordRequest;
 import com.inmobiliaria.identity_service.dto.request.VerifyMfaRequest;
 import com.inmobiliaria.identity_service.dto.response.AuthResponse;
+import com.inmobiliaria.identity_service.dto.response.TwoFactorSetupResponse;
 import com.inmobiliaria.identity_service.exception.EmailSendException;
 import com.inmobiliaria.identity_service.exception.TemporaryPasswordExpiredException;
 import com.inmobiliaria.identity_service.exception.UnauthorizedException;

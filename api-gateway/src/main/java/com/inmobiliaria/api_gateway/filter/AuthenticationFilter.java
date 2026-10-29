@@ -32,6 +32,7 @@ public class AuthenticationFilter
   private static final List<String> OPEN_ENDPOINTS =
       List.of(
           "/api/v1/auth/login",
+          "/api/v1/auth/2fa/verify-login",
           "/api/v1/auth/logout",
           "/api/v1/auth/refresh",
           "/api/v1/auth/forgot-password",
